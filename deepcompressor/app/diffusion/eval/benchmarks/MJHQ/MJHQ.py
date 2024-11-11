@@ -28,14 +28,6 @@ _LICENSE = (
     "(https://hf-mirror.com/playgroundai/playground-v2.5-1024px-aesthetic/blob/main/LICENSE.md)"
 )
 
-IMAGE_URL = (
-    "https://hf-mirror.com/datasets/playgroundai/MJHQ-30K/resolve/main/mjhq30k_imgs.zip"
-)
-
-META_URL = (
-    "https://hf-mirror.com/datasets/playgroundai/MJHQ-30K/resolve/main/meta_data.json"
-)
-
 
 class MJHQConfig(datasets.BuilderConfig):
     def __init__(self, max_dataset_size: int = -1, return_gt: bool = False, **kwargs):
@@ -81,24 +73,33 @@ class DCI(datasets.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager: datasets.download.DownloadManager):
-        # 检查本地缓存路径
+        # 获取 HuggingFace 缓存根目录
         cache_dir = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
         dataset_cache = os.path.join(cache_dir, "datasets", "playgroundai___MJHQ-30K")
 
-        # 检查元数据文件
+        # 本地文件路径
         local_meta_path = os.path.join(dataset_cache, "meta_data.json")
+        local_image_path = os.path.join(dataset_cache, "mjhq30k_imgs.zip")
+
+        # 如果本地文件不存在，则使用远程URL
+        HF_ENDPOINT = os.getenv("HF_ENDPOINT", "https://huggingface.co")
+        meta_url = (
+            f"{HF_ENDPOINT}/datasets/playgroundai/MJHQ-30K/resolve/main/meta_data.json"
+        )
+        image_url = f"{HF_ENDPOINT}/datasets/playgroundai/MJHQ-30K/resolve/main/mjhq30k_imgs.zip"
+
+        # 优先使用本地文件，如果不存在则下载
         meta_path = (
             local_meta_path
             if os.path.exists(local_meta_path)
-            else dl_manager.download(META_URL)
+            else dl_manager.download(meta_url)
         )
 
-        # 检查图片文件夹
-        local_image_root = os.path.join(dataset_cache, "mjhq30k_imgs")
+        print(f"meta_path: {meta_path}")
         image_root = (
-            local_image_root
-            if os.path.exists(local_image_root)
-            else dl_manager.download_and_extract(IMAGE_URL)
+            os.path.join(dataset_cache, "mjhq30k_imgs")
+            if os.path.exists(os.path.join(dataset_cache, "mjhq30k_imgs"))
+            else dl_manager.download_and_extract(image_url)
         )
 
         return [
