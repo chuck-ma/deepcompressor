@@ -398,7 +398,7 @@ class DiffusionPipelineConfig:
             model = load_flux_model(
                 flux_merge_model_id, load_from_file=False, use_4bit=False
             )
-            ckpt_id = "black-forest-labs/FLUX.1-dev"
+            ckpt_id = "mikeyandfriends/PixelWave_FLUX.1-dev_03"
             pipeline = FluxPipeline.from_pretrained(
                 ckpt_id,
                 transformer=model,
