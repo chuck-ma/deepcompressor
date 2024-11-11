@@ -11,12 +11,12 @@ dataset = load_dataset("playgroundai/MJHQ-30K")
 '
 ### Step 1: Evaluation Baselines Preparation
 
-HF_ENDPOINT="https://hf-mirror.com" HF_HOME="/root/autodl-tmp/huggingface" MODELSCOPE_CACHE="/root/autodl-tmp/modelscope/hub" cd examples/diffusion && python -m deepcompressor.app.diffusion.ptq configs/model/flux.1-custom.yaml --output-dirname reference
+ cd examples/diffusion && HF_ENDPOINT="https://hf-mirror.com" HF_HOME="/root/autodl-tmp/huggingface" MODELSCOPE_CACHE="/root/autodl-tmp/modelscope/hub" python -m deepcompressor.app.diffusion.ptq configs/model/flux.1-custom.yaml --output-dirname reference
 
 
 ### Step 2: Calibration Dataset Preparation
 
-HF_ENDPOINT="https://hf-mirror.com" HF_HOME="/root/autodl-tmp/huggingface" MODELSCOPE_CACHE="/root/autodl-tmp/modelscope/hub" cd examples/diffusion && python -m deepcompressor.app.diffusion.dataset.collect.calib \
+cd examples/diffusion && HF_ENDPOINT="https://hf-mirror.com" HF_HOME="/root/autodl-tmp/huggingface" MODELSCOPE_CACHE="/root/autodl-tmp/modelscope/hub" python -m deepcompressor.app.diffusion.dataset.collect.calib \
     configs/model/flux.1-custom.yaml configs/collect/qdiff.yaml
 
 
