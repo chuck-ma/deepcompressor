@@ -6,7 +6,12 @@ import typing as tp
 from dataclasses import dataclass, field
 
 import torch
-from diffusers.pipelines import DiffusionPipeline, FluxPipeline, PixArtAlphaPipeline, PixArtSigmaPipeline
+from diffusers.pipelines import (
+    DiffusionPipeline,
+    FluxPipeline,
+    PixArtAlphaPipeline,
+    PixArtSigmaPipeline,
+)
 from diffusers.pipelines import StableDiffusion3Pipeline as SD3Pipeline
 from diffusers.pipelines import StableDiffusionXLPipeline as SDXLPipeline
 from omniconfig import configclass
@@ -65,15 +70,25 @@ class DiffusionPipelineConfig:
     """
 
     _pipeline_factories: tp.ClassVar[
-        dict[str, tp.Callable[[str, torch.dtype, torch.device, bool], DiffusionPipeline]]
+        dict[
+            str, tp.Callable[[str, torch.dtype, torch.device, bool], DiffusionPipeline]
+        ]
     ] = {}
     _text_extractors: tp.ClassVar[
-        dict[str, tp.Callable[[DiffusionPipeline], list[tuple[str, PreTrainedModel, PreTrainedTokenizer]]]]
+        dict[
+            str,
+            tp.Callable[
+                [DiffusionPipeline],
+                list[tuple[str, PreTrainedModel, PreTrainedTokenizer]],
+            ],
+        ]
     ] = {}
 
     name: str
     dtype: torch.dtype = field(
-        default_factory=lambda s=torch.float32: eval_dtype(s, with_quant_dtype=False, with_none=False)
+        default_factory=lambda s=torch.float32: eval_dtype(
+            s, with_quant_dtype=False, with_none=False
+        )
     )
     device: str = "cuda"
     shift_activations: bool = False
@@ -84,7 +99,10 @@ class DiffusionPipelineConfig:
         self.family = self.name.split("-")[0]
 
     def build(
-        self, *, dtype: str | torch.dtype | None = None, device: str | torch.device | None = None
+        self,
+        *,
+        dtype: str | torch.dtype | None = None,
+        device: str | torch.device | None = None,
     ) -> DiffusionPipeline:
         """Build the diffusion pipeline.
 
@@ -103,7 +121,10 @@ class DiffusionPipelineConfig:
         if device is None:
             device = self.device
         return self._pipeline_factories[self.name](
-            self.name, dtype=dtype, device=device, shift_activations=self.shift_activations
+            self.name,
+            dtype=dtype,
+            device=device,
+            shift_activations=self.shift_activations,
         )
 
     def extract_text_encoders(
@@ -152,7 +173,9 @@ class DiffusionPipelineConfig:
         cls,
         names: str | tuple[str, ...],
         /,
-        extractor: tp.Callable[[DiffusionPipeline], list[tuple[str, PreTrainedModel, PreTrainedTokenizer]]],
+        extractor: tp.Callable[
+            [DiffusionPipeline], list[tuple[str, PreTrainedModel, PreTrainedTokenizer]]
+        ],
         *,
         overwrite: bool = False,
     ) -> None:
@@ -174,7 +197,9 @@ class DiffusionPipelineConfig:
             cls._text_extractors[name] = extractor
 
     def load_lora(  # noqa: C901
-        self, pipeline: DiffusionPipeline, smooth_cache: dict[str, torch.Tensor] | None = None
+        self,
+        pipeline: DiffusionPipeline,
+        smooth_cache: dict[str, torch.Tensor] | None = None,
     ) -> DiffusionPipeline:
         smooth_cache = smooth_cache or {}
         model = pipeline.unet if hasattr(pipeline, "unet") else pipeline.transformer
@@ -182,14 +207,19 @@ class DiffusionPipelineConfig:
         if self.lora is not None:
             logger = tools.logging.getLogger(__name__)
             logger.info(f"Load LoRA branches from {self.lora.path}")
-            assert isinstance(pipeline, FluxPipeline), "LoRA is only supported for FluxPipeline currently."
+            assert isinstance(
+                pipeline, FluxPipeline
+            ), "LoRA is only supported for FluxPipeline currently."
             lora_state_dict, alphas = pipeline.lora_state_dict(
                 self.lora.path, return_alphas=True, weight_name=self.lora.weight_name
             )
             tools.logging.Formatter.indent_inc()
             for name, module in model.named_modules():
                 if isinstance(module, (nn.Linear, ConcatLinear, ShiftedLinear)):
-                    lora_a_key, lora_b_key = f"transformer.{name}.lora_A.weight", f"transformer.{name}.lora_B.weight"
+                    lora_a_key, lora_b_key = (
+                        f"transformer.{name}.lora_A.weight",
+                        f"transformer.{name}.lora_B.weight",
+                    )
                     if lora_a_key in lora_state_dict:
                         assert lora_b_key in lora_state_dict
                         logger.info(f"+ Load LoRA branch for {name}")
@@ -213,34 +243,54 @@ class DiffusionPipelineConfig:
                             assert a.shape[0] == b.shape[1]
                             if isinstance(m, ShiftedLinear):
                                 s, m = m.shift, m.linear
-                                logger.debug(f"- shift LoRA input by {s.item() if s.numel() == 1 else s}")
+                                logger.debug(
+                                    f"- shift LoRA input by {s.item() if s.numel() == 1 else s}"
+                                )
                             else:
                                 s = None
                             assert isinstance(m, nn.Linear)
                             device, dtype = m.weight.device, m.weight.dtype
-                            a, b = a.to(device=device, dtype=torch.float64), b.to(device=device, dtype=torch.float64)
+                            a, b = a.to(device=device, dtype=torch.float64), b.to(
+                                device=device, dtype=torch.float64
+                            )
                             if s is not None:
                                 if s.numel() == 1:
-                                    s = torch.matmul(b, a.sum(dim=1).mul_(s.double())).mul_(self.lora.alpha)
+                                    s = torch.matmul(
+                                        b, a.sum(dim=1).mul_(s.double())
+                                    ).mul_(self.lora.alpha)
                                 else:
-                                    s = torch.matmul(b, torch.matmul(a, s.view(1, -1).double())).mul_(self.lora.alpha)
+                                    s = torch.matmul(
+                                        b, torch.matmul(a, s.view(1, -1).double())
+                                    ).mul_(self.lora.alpha)
                             if hasattr(m, "in_smooth_cache_key"):
-                                logger.debug(f"- smooth LoRA input using {m.in_smooth_cache_key} smooth scale")
-                                ss = smooth_cache[m.in_smooth_cache_key].to(device=device, dtype=torch.float64)
+                                logger.debug(
+                                    f"- smooth LoRA input using {m.in_smooth_cache_key} smooth scale"
+                                )
+                                ss = smooth_cache[m.in_smooth_cache_key].to(
+                                    device=device, dtype=torch.float64
+                                )
                                 a = a.mul_(ss.view(1, -1))
                                 del ss
                             if hasattr(m, "out_smooth_cache_key"):
-                                logger.debug(f"- smooth LoRA output using {m.out_smooth_cache_key} smooth scale")
-                                ss = smooth_cache[m.out_smooth_cache_key].to(device=device, dtype=torch.float64)
+                                logger.debug(
+                                    f"- smooth LoRA output using {m.out_smooth_cache_key} smooth scale"
+                                )
+                                ss = smooth_cache[m.out_smooth_cache_key].to(
+                                    device=device, dtype=torch.float64
+                                )
                                 b = b.div_(ss.view(-1, 1))
                                 if s is not None:
                                     s = s.div_(ss.view(-1))
                                 del ss
                             branch_hook, quant_hook = None, None
                             for hook in m._forward_pre_hooks.values():
-                                if isinstance(hook, AccumBranchHook) and isinstance(hook.branch, LowRankBranch):
+                                if isinstance(hook, AccumBranchHook) and isinstance(
+                                    hook.branch, LowRankBranch
+                                ):
                                     branch_hook = hook
-                                if isinstance(hook, ProcessHook) and isinstance(hook.processor, Quantizer):
+                                if isinstance(hook, ProcessHook) and isinstance(
+                                    hook.processor, Quantizer
+                                ):
                                     quant_hook = hook
                             if branch_hook is not None:
                                 logger.debug("- fuse with existing LoRA branch")
@@ -248,8 +298,14 @@ class DiffusionPipelineConfig:
                                 _a = branch_hook.branch.a.weight.data
                                 _b = branch_hook.branch.b.weight.data
                                 if branch_hook.branch.alpha != self.lora.alpha:
-                                    a, b = a.to(dtype=dtype), b.mul_(self.lora.alpha).to(dtype=dtype)
-                                    _b = _b.to(dtype=torch.float64).mul_(branch_hook.branch.alpha).to(dtype=dtype)
+                                    a, b = a.to(dtype=dtype), b.mul_(
+                                        self.lora.alpha
+                                    ).to(dtype=dtype)
+                                    _b = (
+                                        _b.to(dtype=torch.float64)
+                                        .mul_(branch_hook.branch.alpha)
+                                        .to(dtype=dtype)
+                                    )
                                     alpha = 1
                                 else:
                                     a, b = a.to(dtype=dtype), b.to(dtype=dtype)
@@ -267,19 +323,26 @@ class DiffusionPipelineConfig:
                             else:
                                 logger.debug("- create a new LoRA branch")
                                 branch = LowRankBranch(
-                                    m.in_features, m.out_features, rank=a.shape[0], alpha=self.lora.alpha
+                                    m.in_features,
+                                    m.out_features,
+                                    rank=a.shape[0],
+                                    alpha=self.lora.alpha,
                                 )
                                 branch = branch.to(device=device, dtype=dtype)
                                 branch.a.weight.data.copy_(a.to(dtype=dtype))
                                 branch.b.weight.data.copy_(b.to(dtype=dtype))
                                 # low rank branch hook should be registered before the quantization hook
                                 if quant_hook is not None:
-                                    logger.debug(f"- remove quantization hook from {name}")
+                                    logger.debug(
+                                        f"- remove quantization hook from {name}"
+                                    )
                                     quant_hook.remove(m)
                                 logger.debug(f"- register LoRA branch to {name}")
                                 branch.as_hook().register(m)
                                 if quant_hook is not None:
-                                    logger.debug(f"- re-register quantization hook to {name}")
+                                    logger.debug(
+                                        f"- re-register quantization hook to {name}"
+                                    )
                                     quant_hook.register(m)
                             if s is not None:
                                 assert m.bias is not None
@@ -294,26 +357,44 @@ class DiffusionPipelineConfig:
         branches = nn.ModuleList()
         for _, module in model.named_modules():
             for hook in module._forward_hooks.values():
-                if isinstance(hook, AccumBranchHook) and isinstance(hook.branch, LowRankBranch):
+                if isinstance(hook, AccumBranchHook) and isinstance(
+                    hook.branch, LowRankBranch
+                ):
                     branches.append(hook.branch)
         model.register_module("_low_rank_branches", branches)
 
     @staticmethod
     def _default_build(
-        name: str, dtype: str | torch.dtype, device: str | torch.device, shift_activations: bool
+        name: str,
+        dtype: str | torch.dtype,
+        device: str | torch.device,
+        shift_activations: bool,
     ) -> DiffusionPipeline:
         if name == "sdxl":
             pipeline = SDXLPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=dtype, variant="fp16", use_safetensors=True
+                "stabilityai/stable-diffusion-xl-base-1.0",
+                torch_dtype=dtype,
+                variant="fp16",
+                use_safetensors=True,
             )
         elif name == "sdxl-turbo":
-            pipeline = SDXLPipeline.from_pretrained("stabilityai/sdxl-turbo", torch_dtype=dtype, variant="fp16")
+            pipeline = SDXLPipeline.from_pretrained(
+                "stabilityai/sdxl-turbo", torch_dtype=dtype, variant="fp16"
+            )
         elif name == "pixart-sigma":
-            pipeline = PixArtSigmaPipeline.from_pretrained("PixArt-alpha/PixArt-Sigma-XL-2-1024-MS", torch_dtype=dtype)
+            pipeline = PixArtSigmaPipeline.from_pretrained(
+                "PixArt-alpha/PixArt-Sigma-XL-2-1024-MS", torch_dtype=dtype
+            )
         elif name == "flux.1-dev":
-            pipeline = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-dev", torch_dtype=dtype)
+            pipeline = FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-dev", torch_dtype=dtype
+            )
+        elif name == "flux.1-custom":
+            pass
         elif name == "flux.1-schnell":
-            pipeline = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=dtype)
+            pipeline = FluxPipeline.from_pretrained(
+                "black-forest-labs/FLUX.1-schnell", torch_dtype=dtype
+            )
         else:
             raise NotImplementedError
         pipeline = pipeline.to(device)
@@ -339,11 +420,23 @@ class DiffusionPipelineConfig:
                 The list of text encoder name, model, and tokenizer.
         """
         if isinstance(pipeline, SD3Pipeline):
-            name, encoder, tokenizer = "text_encoder_3", pipeline.text_encoder_3, pipeline.tokenizer_3
+            name, encoder, tokenizer = (
+                "text_encoder_3",
+                pipeline.text_encoder_3,
+                pipeline.tokenizer_3,
+            )
         elif isinstance(pipeline, FluxPipeline):
-            name, encoder, tokenizer = "text_encoder_2", pipeline.text_encoder_2, pipeline.tokenizer_2
+            name, encoder, tokenizer = (
+                "text_encoder_2",
+                pipeline.text_encoder_2,
+                pipeline.tokenizer_2,
+            )
         elif isinstance(pipeline, (PixArtAlphaPipeline, PixArtSigmaPipeline)):
-            name, encoder, tokenizer = "text_encoder", pipeline.text_encoder, pipeline.tokenizer
+            name, encoder, tokenizer = (
+                "text_encoder",
+                pipeline.text_encoder,
+                pipeline.tokenizer,
+            )
         else:
             raise NotImplementedError(f"Unsupported pipeline type: {type(pipeline)}")
         assert isinstance(encoder, T5EncoderModel)
@@ -351,7 +444,8 @@ class DiffusionPipelineConfig:
 
 
 DiffusionPipelineConfig.register_pipeline_factory(
-    ("sdxl", "sdxl-turbo", "pixart-sigma", "flux.1-dev", "flux.1-schnell"), DiffusionPipelineConfig._default_build
+    ("sdxl", "sdxl-turbo", "pixart-sigma", "flux.1-dev", "flux.1-schnell"),
+    DiffusionPipelineConfig._default_build,
 )
 
 DiffusionPipelineConfig.register_text_extractor(
