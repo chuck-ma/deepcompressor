@@ -21,16 +21,20 @@ We introduce a new benchmark, MJHQ-30K, for automatic evaluation of a model’s 
 The benchmark computes FID on a high-quality dataset to gauge aesthetic quality.
 """
 
-_HOMEPAGE = "https://huggingface.co/datasets/playgroundai/MJHQ-30K"
+_HOMEPAGE = "https://hf-mirror.com/datasets/playgroundai/MJHQ-30K"
 
 _LICENSE = (
     "Playground v2.5 Community License "
-    "(https://huggingface.co/playgroundai/playground-v2.5-1024px-aesthetic/blob/main/LICENSE.md)"
+    "(https://hf-mirror.com/playgroundai/playground-v2.5-1024px-aesthetic/blob/main/LICENSE.md)"
 )
 
-IMAGE_URL = "https://huggingface.co/datasets/playgroundai/MJHQ-30K/resolve/main/mjhq30k_imgs.zip"
+IMAGE_URL = (
+    "https://hf-mirror.com/datasets/playgroundai/MJHQ-30K/resolve/main/mjhq30k_imgs.zip"
+)
 
-META_URL = "https://huggingface.co/datasets/playgroundai/MJHQ-30K/resolve/main/meta_data.json"
+META_URL = (
+    "https://hf-mirror.com/datasets/playgroundai/MJHQ-30K/resolve/main/meta_data.json"
+)
 
 
 class MJHQConfig(datasets.BuilderConfig):
@@ -50,7 +54,9 @@ class DCI(datasets.GeneratorBasedBuilder):
     VERSION = datasets.Version("0.0.0")
 
     BUILDER_CONFIG_CLASS = MJHQConfig
-    BUILDER_CONFIGS = [MJHQConfig(name="MJHQ", version=VERSION, description="MJHQ-30K full dataset")]
+    BUILDER_CONFIGS = [
+        MJHQConfig(name="MJHQ", version=VERSION, description="MJHQ-30K full dataset")
+    ]
     DEFAULT_CONFIG_NAME = "MJHQ"
 
     def _info(self):
@@ -67,15 +73,38 @@ class DCI(datasets.GeneratorBasedBuilder):
             }
         )
         return datasets.DatasetInfo(
-            description=_DESCRIPTION, features=features, homepage=_HOMEPAGE, license=_LICENSE, citation=_CITATION
+            description=_DESCRIPTION,
+            features=features,
+            homepage=_HOMEPAGE,
+            license=_LICENSE,
+            citation=_CITATION,
         )
 
     def _split_generators(self, dl_manager: datasets.download.DownloadManager):
-        meta_path = dl_manager.download(META_URL)
-        image_root = dl_manager.download_and_extract(IMAGE_URL)
+        # 检查本地缓存路径
+        cache_dir = os.getenv("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
+        dataset_cache = os.path.join(cache_dir, "datasets", "playgroundai___MJHQ-30K")
+
+        # 检查元数据文件
+        local_meta_path = os.path.join(dataset_cache, "meta_data.json")
+        meta_path = (
+            local_meta_path
+            if os.path.exists(local_meta_path)
+            else dl_manager.download(META_URL)
+        )
+
+        # 检查图片文件夹
+        local_image_root = os.path.join(dataset_cache, "mjhq30k_imgs")
+        image_root = (
+            local_image_root
+            if os.path.exists(local_image_root)
+            else dl_manager.download_and_extract(IMAGE_URL)
+        )
+
         return [
             datasets.SplitGenerator(
-                name=datasets.Split.TRAIN, gen_kwargs={"meta_path": meta_path, "image_root": image_root}
+                name=datasets.Split.TRAIN,
+                gen_kwargs={"meta_path": meta_path, "image_root": image_root},
             ),
         ]
 
