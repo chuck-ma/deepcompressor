@@ -22,6 +22,7 @@ from deepcompressor.data.utils.dtype import eval_dtype
 from deepcompressor.quantizer.processor import Quantizer
 from deepcompressor.utils import tools
 from deepcompressor.utils.hooks import AccumBranchHook, ProcessHook
+from deepcompressor.app.diffusion.pipeline.component import load_flux_model
 
 from ....nn.patch.linear import ConcatLinear, ShiftedLinear
 from ....nn.patch.lowrank import LowRankBranch
@@ -30,6 +31,7 @@ from ..nn.patch import (
     replace_up_block_conv_with_concat_conv,
     shift_input_activations,
 )
+
 
 __all__ = ["DiffusionPipelineConfig"]
 
@@ -390,7 +392,19 @@ class DiffusionPipelineConfig:
                 "black-forest-labs/FLUX.1-dev", torch_dtype=dtype
             )
         elif name == "flux.1-custom":
-            pass
+            flux_merge_model_id = "/root/autodl-fs/stoiqoNewrealityFLUXSD_f1DAlphaTwo"
+            from deepcompressor.app.diffusion.pipeline.t5_encoder import text_encoder_2
+
+            model = load_flux_model(
+                flux_merge_model_id, load_from_file=False, use_4bit=False
+            )
+            ckpt_id = "black-forest-labs/FLUX.1-dev"
+            pipeline = FluxPipeline.from_pretrained(
+                ckpt_id,
+                transformer=model,
+                text_encoder_2=text_encoder_2,
+                torch_dtype=dtype,
+            )
         elif name == "flux.1-schnell":
             pipeline = FluxPipeline.from_pretrained(
                 "black-forest-labs/FLUX.1-schnell", torch_dtype=dtype
