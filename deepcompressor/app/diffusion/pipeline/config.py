@@ -458,11 +458,25 @@ class DiffusionPipelineConfig:
 
 
 DiffusionPipelineConfig.register_pipeline_factory(
-    ("sdxl", "sdxl-turbo", "pixart-sigma", "flux.1-dev", "flux.1-schnell"),
+    (
+        "sdxl",
+        "sdxl-turbo",
+        "pixart-sigma",
+        "flux.1-dev",
+        "flux.1-schnell",
+        "flux.1-custom",
+    ),
     DiffusionPipelineConfig._default_build,
 )
 
 DiffusionPipelineConfig.register_text_extractor(
-    ("sdxl", "sdxl-turbo", "pixart-sigma", "flux.1-dev", "flux.1-schnell"),
+    (
+        "sdxl",
+        "sdxl-turbo",
+        "pixart-sigma",
+        "flux.1-dev",
+        "flux.1-schnell",
+        "flux.1-custom",
+    ),
     DiffusionPipelineConfig._default_extract_text_encoders,
 )
