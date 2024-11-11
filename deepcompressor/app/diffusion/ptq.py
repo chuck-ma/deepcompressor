@@ -10,7 +10,12 @@ from diffusers import DiffusionPipeline
 from deepcompressor.app.llm.ptq import ptq as llm_ptq
 from deepcompressor.utils import tools
 
-from .config import DiffusionPtqCacheConfig, DiffusionPtqRunConfig, DiffusionQuantCacheConfig, DiffusionQuantConfig
+from .config import (
+    DiffusionPtqCacheConfig,
+    DiffusionPtqRunConfig,
+    DiffusionQuantCacheConfig,
+    DiffusionQuantConfig,
+)
 from .nn.struct import DiffusionModelStruct
 from .quant import (
     load_diffusion_weights_state_dict,
@@ -18,6 +23,12 @@ from .quant import (
     quantize_diffusion_weights,
     smooth_diffusion,
 )
+
+import os
+
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_HOME"] = "/root/autodl-tmp/huggingface"
+os.environ["MODELSCOPE_CACHE"] = "/root/autodl-tmp/modelscope/hub"
 
 __all__ = ["ptq"]
 
@@ -78,7 +89,9 @@ def ptq(  # noqa: C901
                 if os.path.exists(load_path.branch):
                     load_model = True
                 else:
-                    logger.warning(f"Model low-rank branch checkpoint {load_path.branch} does not exist")
+                    logger.warning(
+                        f"Model low-rank branch checkpoint {load_path.branch} does not exist"
+                    )
                     load_model = False
             else:
                 load_model = True
@@ -142,7 +155,9 @@ def ptq(  # noqa: C901
             orig_state_dict = None
         else:
             orig_state_dict: dict[str, torch.Tensor] = {
-                name: param.detach().clone() for name, param in model.module.named_parameters() if param.ndim > 1
+                name: param.detach().clone()
+                for name, param in model.module.named_parameters()
+                if param.ndim > 1
             }
     else:
         orig_state_dict = None
@@ -153,7 +168,11 @@ def ptq(  # noqa: C901
             model,
             config,
             state_dict=torch.load(load_model_path),
-            branch_state_dict=torch.load(load_path.branch) if os.path.exists(load_path.branch) else None,
+            branch_state_dict=(
+                torch.load(load_path.branch)
+                if os.path.exists(load_path.branch)
+                else None
+            ),
         )
         gc.collect()
         torch.cuda.empty_cache()
@@ -180,12 +199,14 @@ def ptq(  # noqa: C901
             logger.info("- Generating weight settings")
         if not branch_load_from:
             logger.info("- Generating branch settings")
-        quantizer_state_dict, branch_state_dict, scale_state_dict = quantize_diffusion_weights(
-            model,
-            config,
-            quantizer_state_dict=quantizer_state_dict,
-            branch_state_dict=branch_state_dict,
-            return_with_scale_state_dict=bool(save_dirpath),
+        quantizer_state_dict, branch_state_dict, scale_state_dict = (
+            quantize_diffusion_weights(
+                model,
+                config,
+                quantizer_state_dict=quantizer_state_dict,
+                branch_state_dict=branch_state_dict,
+                return_with_scale_state_dict=bool(save_dirpath),
+            )
         )
         if not quantizer_load_from and cache and cache.dirpath.wgts:
             logger.info(f"- Saving weight settings to {cache.path.wgts}")
@@ -200,20 +221,26 @@ def ptq(  # noqa: C901
         if save_path:
             if not copy_on_save and quantizer_load_from:
                 logger.info(f"- Linking weight settings to {save_path.wgts}")
-                os.symlink(os.path.relpath(quantizer_load_from, save_dirpath), save_path.wgts)
+                os.symlink(
+                    os.path.relpath(quantizer_load_from, save_dirpath), save_path.wgts
+                )
             else:
                 logger.info(f"- Saving weight settings to {save_path.wgts}")
                 torch.save(quantizer_state_dict, save_path.wgts)
             if not copy_on_save and branch_load_from:
                 logger.info(f"- Linking branch settings to {save_path.branch}")
-                os.symlink(os.path.relpath(branch_load_from, save_dirpath), save_path.branch)
+                os.symlink(
+                    os.path.relpath(branch_load_from, save_dirpath), save_path.branch
+                )
             else:
                 logger.info(f"- Saving branch settings to {save_path.branch}")
                 torch.save(branch_state_dict, save_path.branch)
         if save_model:
             logger.info(f"- Saving model to {save_dirpath}")
             torch.save(scale_state_dict, os.path.join(save_dirpath, "scale.pt"))
-            torch.save(model.module.state_dict(), os.path.join(save_dirpath, "model.pt"))
+            torch.save(
+                model.module.state_dict(), os.path.join(save_dirpath, "model.pt")
+            )
         del quantizer_state_dict, branch_state_dict, scale_state_dict
         tools.logging.Formatter.indent_dec()
         gc.collect()
@@ -231,11 +258,16 @@ def ptq(  # noqa: C901
                 logger.info(f"- Loading activation settings from {load_from}")
                 quantizer_state_dict = torch.load(load_from)
                 quantize_diffusion_activations(
-                    model, config, quantizer_state_dict=quantizer_state_dict, orig_state_dict=orig_state_dict
+                    model,
+                    config,
+                    quantizer_state_dict=quantizer_state_dict,
+                    orig_state_dict=orig_state_dict,
                 )
             else:
                 logger.info("- Generating activation settings")
-                quantizer_state_dict = quantize_diffusion_activations(model, config, orig_state_dict=orig_state_dict)
+                quantizer_state_dict = quantize_diffusion_activations(
+                    model, config, orig_state_dict=orig_state_dict
+                )
                 if cache and cache.dirpath.acts and quantizer_state_dict is not None:
                     logger.info(f"- Saving activation settings to {cache.path.acts}")
                     os.makedirs(cache.dirpath.acts, exist_ok=True)
@@ -243,15 +275,21 @@ def ptq(  # noqa: C901
                 load_from = cache.path.acts
             if save_dirpath:
                 if not copy_on_save and load_from:
-                    logger.info(f"- Linking activation quantizer settings to {save_path.acts}")
+                    logger.info(
+                        f"- Linking activation quantizer settings to {save_path.acts}"
+                    )
                     os.symlink(os.path.relpath(load_from, save_dirpath), save_path.acts)
                 else:
-                    logger.info(f"- Saving activation quantizer settings to {save_path.acts}")
+                    logger.info(
+                        f"- Saving activation quantizer settings to {save_path.acts}"
+                    )
                     torch.save(quantizer_state_dict, save_path.acts)
             del quantizer_state_dict
         else:
             logger.info("- No need to generate/load activation quantizer settings")
-            quantize_diffusion_activations(model, config, orig_state_dict=orig_state_dict)
+            quantize_diffusion_activations(
+                model, config, orig_state_dict=orig_state_dict
+            )
         tools.logging.Formatter.indent_dec()
         del orig_state_dict
         gc.collect()
@@ -259,7 +297,9 @@ def ptq(  # noqa: C901
     return model
 
 
-def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG) -> DiffusionPipeline:
+def main(
+    config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
+) -> DiffusionPipeline:
     """Post-training quantization of a diffusion model.
 
     Args:
@@ -274,13 +314,17 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
     """
     config.output.lock()
     config.dump(path=config.output.get_running_job_path("config.yaml"))
-    tools.logging.setup(path=config.output.get_running_job_path("run.log"), level=logging_level)
+    tools.logging.setup(
+        path=config.output.get_running_job_path("run.log"), level=logging_level
+    )
     logger = tools.logging.getLogger(__name__)
 
     logger.info("=== Configurations ===")
     tools.logging.info(config.formatted_str(), logger=logger)
     logger.info("=== Dumped Configurations ===")
-    tools.logging.info(pprint.pformat(config.dump(), indent=2, width=120), logger=logger)
+    tools.logging.info(
+        pprint.pformat(config.dump(), indent=2, width=120), logger=logger
+    )
     logger.info("=== Output Directory ===")
     logger.info(config.output.job_dirpath)
 
@@ -295,7 +339,10 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
         if config.save_model.lower() in ("false", "none", "null", "nil"):
             save_model = False
         elif config.save_model.lower() in ("true", "default"):
-            save_dirpath, save_model = os.path.join(config.output.running_job_dirpath, "model"), True
+            save_dirpath, save_model = (
+                os.path.join(config.output.running_job_dirpath, "model"),
+                True,
+            )
         else:
             save_dirpath, save_model = config.save_model, True
     else:
@@ -312,16 +359,22 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
     if config.pipeline.lora is not None:
         load_from = ""
         if config.quant.enabled_smooth:
-            if config.load_from and os.path.exists(os.path.join(config.load_from, "smooth.pt")):
+            if config.load_from and os.path.exists(
+                os.path.join(config.load_from, "smooth.pt")
+            ):
                 load_from = os.path.join(config.load_from, "smooth.pt")
             elif config.cache.path and os.path.exists(config.cache.path.smooth):
                 load_from = config.cache.path.smooth
             elif os.path.exists(os.path.join(save_dirpath, "smooth.pt")):
                 load_from = os.path.join(save_dirpath, "smooth.pt")
             logger.info(f"* Loading smooth scales from {load_from}")
-        config.pipeline.load_lora(pipeline, smooth_cache=torch.load(load_from) if load_from else None)
+        config.pipeline.load_lora(
+            pipeline, smooth_cache=torch.load(load_from) if load_from else None
+        )
     if config.text is not None and config.text.is_enabled():
-        for encoder_name, encoder, tokenizer in config.pipeline.extract_text_encoders(pipeline):
+        for encoder_name, encoder, tokenizer in config.pipeline.extract_text_encoders(
+            pipeline
+        ):
             logger.info(f"* Post-training quantizing the text encoder {encoder_name}")
             save_dirpath = os.path.join(save_dirpath, "encoder")
             setattr(
@@ -332,7 +385,11 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
                     tokenizer,
                     config.text,
                     cache=config.text_cache,
-                    load_dirpath=os.path.join(config.load_from, "encoder") if config.load_from else "",
+                    load_dirpath=(
+                        os.path.join(config.load_from, "encoder")
+                        if config.load_from
+                        else ""
+                    ),
                     save_dirpath=save_dirpath,
                     copy_on_save=config.copy_on_save,
                     save_model=save_model,
@@ -348,7 +405,9 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
             config.eval.generate(pipeline)
             tools.logging.Formatter.indent_dec()
     else:
-        logger.info(f"* Evaluating model {'(skipping generation)' if config.skip_gen else ''}")
+        logger.info(
+            f"* Evaluating model {'(skipping generation)' if config.skip_gen else ''}"
+        )
         tools.logging.Formatter.indent_inc()
         results = config.eval.evaluate(pipeline, skip_gen=config.skip_gen)
         tools.logging.Formatter.indent_dec()
@@ -360,7 +419,9 @@ def main(config: DiffusionPtqRunConfig, logging_level: int = tools.logging.DEBUG
 
 
 if __name__ == "__main__":
-    config, _, unused_cfgs, unused_args, unknown_args = DiffusionPtqRunConfig.get_parser().parse_known_args()
+    config, _, unused_cfgs, unused_args, unknown_args = (
+        DiffusionPtqRunConfig.get_parser().parse_known_args()
+    )
     assert isinstance(config, DiffusionPtqRunConfig)
     if len(unused_cfgs) > 0:
         tools.logging.warning(f"Unused configurations: {unused_cfgs}")
