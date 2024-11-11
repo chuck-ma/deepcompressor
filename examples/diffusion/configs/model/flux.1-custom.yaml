@@ -57,3 +57,4 @@ quant:
       sample_batch_size: 16
       sample_size: -1
 skip_eval: true
+skip_gen: true
