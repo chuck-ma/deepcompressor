@@ -2,7 +2,7 @@ pipeline:
   name: flux.1-custom
   dtype: torch.bfloat16
 eval:
-  num_steps: 12
+  num_steps: 15
   guidance_scale: 3.5
   protocol: fmeuler{num_steps}-g{guidance_scale}
 quant:
