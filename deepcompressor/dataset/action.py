@@ -8,14 +8,27 @@ import torch
 import torch.nn as nn
 
 from ..data.cache import IOTensorsCache, TensorsCache
-from ..utils.hooks import BaseInputPackager, BaseOutputPackager, Hook, IOHook, KeyedInputPackager, KeyedOutputPackager
+from ..utils.hooks import (
+    BaseInputPackager,
+    BaseOutputPackager,
+    Hook,
+    IOHook,
+    KeyedInputPackager,
+    KeyedOutputPackager,
+)
 
 __all__ = ["CacheAction", "ConcatCacheAction"]
 
 
 class CacheHook(IOHook):
     def __init__(
-        self, name: str, module: nn.Module, action: "CacheAction", cache: TensorsCache, info_mode: bool, is_output: bool
+        self,
+        name: str,
+        module: nn.Module,
+        action: "CacheAction",
+        cache: TensorsCache,
+        info_mode: bool,
+        is_output: bool,
     ):
         """Initialize the hook.
 
@@ -36,8 +49,12 @@ class CacheHook(IOHook):
         super().__init__(
             pre=not is_output,
             post=is_output,
-            input_packager=None if is_output else action.get_input_packager(name, module, cache),
-            output_packager=action.get_output_packager(name, module, cache) if is_output else None,
+            input_packager=(
+                None if is_output else action.get_input_packager(name, module, cache)
+            ),
+            output_packager=(
+                action.get_output_packager(name, module, cache) if is_output else None
+            ),
         )
         self.name = name
         self.action = action
@@ -51,9 +68,13 @@ class CacheHook(IOHook):
         input_kwargs: dict[str, tp.Any],
     ) -> None:
         tensors = self.input_packager.unpack(module, input_args, input_kwargs)
+        for k, v in tensors.items():
+            print(f"key: {k}, type: {type(v)}")
         if self.info_mode:
             self.action.info(self.name, module, tensors, self.cache)
-        assert len(tensors) == self.cache.num_tensors, f"Expected {self.cache.num_tensors} args, but got {len(tensors)}"
+        assert (
+            len(tensors) == self.cache.num_tensors
+        ), f"Expected {self.cache.num_tensors} args, but got {len(tensors)}"
         if not self.info_mode:
             self.action.apply(self.name, module, tensors, self.cache)
 
@@ -67,7 +88,9 @@ class CacheHook(IOHook):
         tensors = self.output_packager.unpack(module, input_args, input_kwargs, output)
         if self.info_mode:
             self.action.info(self.name, module, tensors, self.cache)
-        assert len(tensors) == self.cache.num_tensors, f"Expected {self.cache.num_tensors} args, but got {len(tensors)}"
+        assert (
+            len(tensors) == self.cache.num_tensors
+        ), f"Expected {self.cache.num_tensors} args, but got {len(tensors)}"
         if not self.info_mode:
             self.action.apply(self.name, module, tensors, self.cache)
 
@@ -130,7 +153,9 @@ class CacheAction(ABC):
         """
         ...
 
-    def get_input_packager(self, name: str, module: nn.Module, cache: TensorsCache) -> BaseInputPackager:
+    def get_input_packager(
+        self, name: str, module: nn.Module, cache: TensorsCache
+    ) -> BaseInputPackager:
         """Get input packager.
 
         Args:
@@ -147,7 +172,9 @@ class CacheAction(ABC):
         """
         return KeyedInputPackager(module=module, index_or_keys=list(cache.keys()))
 
-    def get_output_packager(self, name: str, module: nn.Module, cache: TensorsCache) -> BaseOutputPackager:
+    def get_output_packager(
+        self, name: str, module: nn.Module, cache: TensorsCache
+    ) -> BaseOutputPackager:
         """Get output packager.
 
         Args:
@@ -196,10 +223,18 @@ class CacheAction(ABC):
         hooks = []
         if needs_inputs:
             assert cache.inputs is not None
-            hooks.append(CacheHook(name, module, self, cache.inputs, info_mode, is_output=False).register(module))
+            hooks.append(
+                CacheHook(
+                    name, module, self, cache.inputs, info_mode, is_output=False
+                ).register(module)
+            )
         if needs_outputs:
             assert cache.outputs is not None
-            hooks.append(CacheHook(name, module, self, cache.outputs, info_mode, is_output=True).register(module))
+            hooks.append(
+                CacheHook(
+                    name, module, self, cache.outputs, info_mode, is_output=True
+                ).register(module)
+            )
         return hooks
 
 
@@ -232,7 +267,9 @@ class ConcatCacheAction(CacheAction):
             c.num_cached += shape[0]
             if num_prev_cached == 0:
                 assert len(c.data) == 0
-                c.data.append(torch.empty((c.num_total, *shape[1:]), dtype=x.dtype, device=device))
+                c.data.append(
+                    torch.empty((c.num_total, *shape[1:]), dtype=x.dtype, device=device)
+                )
             c.data[0][num_prev_cached : c.num_cached].copy_(x)
 
     def info(
