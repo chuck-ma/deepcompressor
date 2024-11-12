@@ -1,4 +1,4 @@
-from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+from diffusers import FluxTransformer2DModel
 import torch
 
 
