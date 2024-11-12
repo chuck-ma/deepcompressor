@@ -262,15 +262,29 @@ class ConcatCacheAction(CacheAction):
         """
         for k, c in cache.tensors.items():
             x = tensors[k]
-            shape, device = x.shape, self.device or x.device
+            if isinstance(x, tuple):
+                x_tensor = x[0]
+                shape, device = x_tensor.shape, self.device or x_tensor.device
+            else:
+                shape, device = x.shape, self.device or x.device
+
             num_prev_cached = c.num_cached
             c.num_cached += shape[0]
+
             if num_prev_cached == 0:
                 assert len(c.data) == 0
                 c.data.append(
-                    torch.empty((c.num_total, *shape[1:]), dtype=x.dtype, device=device)
+                    torch.empty(
+                        (c.num_total, *shape[1:]),
+                        dtype=x_tensor.dtype if isinstance(x, tuple) else x.dtype,
+                        device=device,
+                    )
                 )
-            c.data[0][num_prev_cached : c.num_cached].copy_(x)
+
+            if isinstance(x, tuple):
+                c.data[0][num_prev_cached : c.num_cached].copy_(x_tensor)
+            else:
+                c.data[0][num_prev_cached : c.num_cached].copy_(x)
 
     def info(
         self,
@@ -293,5 +307,9 @@ class ConcatCacheAction(CacheAction):
         """
         for k, c in cache.tensors.items():
             x = tensors[k]
-            c.num_total += x.shape[0]
-            c.orig_device = x.device
+            if isinstance(x, tuple):
+                c.num_total += x[0].shape[0]
+                c.orig_device = x[0].device
+            else:
+                c.num_total += x.shape[0]
+                c.orig_device = x.device
