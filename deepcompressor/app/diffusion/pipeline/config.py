@@ -396,7 +396,8 @@ class DiffusionPipelineConfig:
             from deepcompressor.app.diffusion.pipeline.t5_encoder import text_encoder_2
 
             model = load_flux_model(
-                flux_merge_model_id, load_from_file=False, use_4bit=False
+                flux_merge_model_id,
+                load_from_file=False,
             )
             ckpt_id = "mikeyandfriends/PixelWave_FLUX.1-dev_03"
             pipeline = FluxPipeline.from_pretrained(

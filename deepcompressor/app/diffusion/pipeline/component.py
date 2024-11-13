@@ -5,7 +5,6 @@ import torch
 def load_flux_model(
     model_path: str,
     load_from_file: bool = False,
-    use_4bit: bool = True,
     dtype: torch.dtype = torch.bfloat16,
 ) -> FluxTransformer2DModel:
     """
@@ -17,20 +16,10 @@ def load_flux_model(
         use_4bit: 是否使用4bit量化
         dtype: 模型计算精度
     """
-    if use_4bit:
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=dtype
-        )
-    else:
-        quantization_config = None
 
     if load_from_file:
-        model = FluxTransformer2DModel.from_single_file(
-            model_path, quantization_config=quantization_config, torch_dtype=dtype
-        )
+        model = FluxTransformer2DModel.from_single_file(model_path, torch_dtype=dtype)
     else:
-        model = FluxTransformer2DModel.from_pretrained(
-            model_path, quantization_config=quantization_config, torch_dtype=dtype
-        )
+        model = FluxTransformer2DModel.from_pretrained(model_path, torch_dtype=dtype)
 
     return model
